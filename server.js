@@ -11,15 +11,28 @@ const multer = require('multer');
 const path = require('node:path');
 const fs = require('node:fs');
 
+const googleSheetsAdapter = require('./googleSheets');
 const supabaseAdapter = require('./supabase');
 const localDb = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Setup Multer (Gunakan MemoryStorage jika Supabase aktif agar foto langsung diunggah ke Cloud Storage)
+// Seleksi adapter cloud aktif (Prioritas: Google Sheets -> Supabase -> Local)
+let cloudAdapter = null;
+let providerName = 'Local Database';
+
+if (googleSheetsAdapter.isConfigured) {
+  cloudAdapter = googleSheetsAdapter;
+  providerName = 'Google Sheets (Spreadsheet Cloud)';
+} else if (supabaseAdapter.isConfigured) {
+  cloudAdapter = supabaseAdapter;
+  providerName = 'Supabase Cloud (PostgreSQL)';
+}
+
+// Setup Multer (Gunakan MemoryStorage jika Cloud aktif agar foto langsung diunggah ke Google Drive / Cloud Storage)
 let upload = null;
-if (supabaseAdapter.isConfigured) {
+if (cloudAdapter) {
   upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }
@@ -64,21 +77,21 @@ app.use(express.static(path.join(__dirname)));
 app.get('/api/status', (req, res) => {
   res.json({
     success: true,
-    cloud: supabaseAdapter.isConfigured,
-    provider: supabaseAdapter.isConfigured ? 'Supabase Cloud (PostgreSQL)' : 'Local Database',
-    message: supabaseAdapter.isConfigured 
-      ? 'Database Cloud Supabase aktif. Data dapat diakses dari mana saja secara real-time.' 
-      : 'Supabase belum terhubung. Berjalan dalam mode database lokal.'
+    cloud: !!cloudAdapter,
+    provider: providerName,
+    message: cloudAdapter 
+      ? `Database ${providerName} aktif. Data tersimpan di Cloud dan dapat diakses dari mana saja secara real-time.` 
+      : 'Database Cloud belum terhubung. Berjalan dalam mode database lokal.'
   });
 });
 
 // 1. Ambil Semua Flok / Kandang
 app.get('/api/flocks', async (req, res) => {
   try {
-    if (supabaseAdapter.isConfigured) {
-      const flocks = await supabaseAdapter.getAllFlocks();
+    if (cloudAdapter) {
+      const flocks = await cloudAdapter.getAllFlocks();
       const result = await Promise.all(flocks.map(async f => {
-        const weighings = await supabaseAdapter.getWeighingsByFlock(f.id);
+        const weighings = await cloudAdapter.getWeighingsByFlock(f.id);
         return {
           id: f.id,
           name: f.name,
@@ -97,7 +110,7 @@ app.get('/api/flocks', async (req, res) => {
           weighings: weighings
         };
       }));
-      return res.json({ success: true, cloud: true, data: result });
+      return res.json({ success: true, cloud: true, provider: providerName, data: result });
     }
 
     // Fallback Local / Vercel Tmp
@@ -156,11 +169,12 @@ app.post('/api/flocks', async (req, res) => {
       notes: notes || ''
     };
 
-    if (supabaseAdapter.isConfigured) {
-      const created = await supabaseAdapter.createFlock(payload);
+    if (cloudAdapter) {
+      const created = await cloudAdapter.createFlock(payload);
       return res.json({
         success: true,
         cloud: true,
+        provider: providerName,
         data: {
           id: created.id,
           name: created.name,
@@ -208,13 +222,14 @@ app.post('/api/flocks', async (req, res) => {
 // 3. Detail Flok Tunggal
 app.get('/api/flocks/:id', async (req, res) => {
   try {
-    if (supabaseAdapter.isConfigured) {
-      const f = await supabaseAdapter.getFlockById(req.params.id);
+    if (cloudAdapter) {
+      const f = await cloudAdapter.getFlockById(req.params.id);
       if (!f) return res.status(404).json({ success: false, error: 'Flok tidak ditemukan.' });
-      const weighings = await supabaseAdapter.getWeighingsByFlock(f.id);
+      const weighings = await cloudAdapter.getWeighingsByFlock(f.id);
       return res.json({
         success: true,
         cloud: true,
+        provider: providerName,
         data: {
           id: f.id,
           name: f.name,
@@ -263,9 +278,9 @@ app.get('/api/flocks/:id', async (req, res) => {
 // 4. Hapus Flok
 app.delete('/api/flocks/:id', async (req, res) => {
   try {
-    if (supabaseAdapter.isConfigured) {
-      await supabaseAdapter.deleteFlock(req.params.id);
-      return res.json({ success: true, message: 'Flok berhasil dihapus dari Supabase.' });
+    if (cloudAdapter) {
+      await cloudAdapter.deleteFlock(req.params.id);
+      return res.json({ success: true, message: `Flok berhasil dihapus dari ${providerName}.` });
     }
     localDb.deleteFlock(req.params.id);
     res.json({ success: true, message: 'Flok berhasil dihapus.' });
@@ -325,10 +340,10 @@ app.post('/api/flocks/:id/weighings', upload.single('photo'), async (req, res) =
     }
 
     let photoUrl = '';
-    // Jika Supabase aktif dan user mengunggah foto, unggah langsung ke Supabase S3 Storage!
+    // Jika Cloud aktif dan user mengunggah foto, unggah langsung ke Cloud Storage (Google Drive / Supabase)!
     if (req.file) {
-      if (supabaseAdapter.isConfigured && req.file.buffer) {
-        photoUrl = await supabaseAdapter.uploadDocumentationPhoto(
+      if (cloudAdapter && req.file.buffer) {
+        photoUrl = await cloudAdapter.uploadDocumentationPhoto(
           req.file.buffer,
           req.file.originalname,
           req.file.mimetype
@@ -360,14 +375,15 @@ app.post('/api/flocks/:id/weighings', upload.single('photo'), async (req, res) =
       photoUrl
     };
 
-    if (supabaseAdapter.isConfigured) {
-      await supabaseAdapter.upsertWeighing(payload);
-      const updatedWeighings = await supabaseAdapter.getWeighingsByFlock(flockId);
-      const updatedFlock = await supabaseAdapter.getFlockById(flockId);
+    if (cloudAdapter) {
+      await cloudAdapter.upsertWeighing(payload);
+      const updatedWeighings = await cloudAdapter.getWeighingsByFlock(flockId);
+      const updatedFlock = await cloudAdapter.getFlockById(flockId);
       return res.json({
         success: true,
         cloud: true,
-        message: `Data penimbangan minggu ke-${week} tersimpan di Cloud Supabase!`,
+        provider: providerName,
+        message: `Data penimbangan minggu ke-${week} tersimpan di ${providerName}!`,
         data: {
           flock: updatedFlock,
           weighings: updatedWeighings
@@ -382,7 +398,6 @@ app.post('/api/flocks/:id/weighings', upload.single('photo'), async (req, res) =
     res.json({
       success: true,
       cloud: false,
-      message: `Data penimbangan minggu ke-${week} berhasil disimpan.`,
       data: {
         flock: updatedFlock,
         weighings: updatedWeighings
@@ -398,9 +413,9 @@ app.post('/api/flocks/:id/weighings', upload.single('photo'), async (req, res) =
 app.delete('/api/flocks/:id/weighings/:week', async (req, res) => {
   try {
     const { id, week } = req.params;
-    if (supabaseAdapter.isConfigured) {
-      await supabaseAdapter.deleteWeighing(id, week);
-      return res.json({ success: true, message: `Data minggu ke-${week} telah dihapus dari Cloud.` });
+    if (cloudAdapter) {
+      await cloudAdapter.deleteWeighing(id, week);
+      return res.json({ success: true, message: `Data minggu ke-${week} telah dihapus dari ${providerName}.` });
     }
     localDb.deleteWeighing(id, week);
     res.json({ success: true, message: `Data penimbangan minggu ke-${week} berhasil dihapus.` });
@@ -413,7 +428,7 @@ app.delete('/api/flocks/:id/weighings/:week', async (req, res) => {
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🐔 Server BRMP PoultryTrack aktif di http://localhost:${PORT}`);
-    console.log(`🌐 Mode Database: ${supabaseAdapter.isConfigured ? '☁️ Supabase Cloud (Global Online)' : '💻 Local Database'}`);
+    console.log(`🌐 Mode Database: ${cloudAdapter ? `☁️ ${providerName}` : '💻 Local Database'}`);
   });
 }
 

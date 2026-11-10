@@ -32,8 +32,44 @@ npm start
 ```
 Lalu buka: `http://localhost:3000`
 
-### Pembaruan Database Supabase
-Jika menggunakan Supabase dengan tabel yang sudah ada, jalankan blok `ALTER TABLE` pada `supabase-schema.sql` melalui SQL Editor agar kolom kategori, mutasi populasi, dan produksi telur ditambahkan. Hindari menjalankan ulang blok `CREATE POLICY` jika kebijakan akses sebelumnya sudah dibuat.
+### Cara 3: Menggunakan Google Spreadsheet sebagai Database Cloud (Vercel Ready)
+1. Buka spreadsheet baru di Google Drive: [sheets.new](https://sheets.new)
+2. Beri nama spreadsheet Anda, misalnya `BRMP PoultryTrack Database`.
+3. Klik menu **Ekstensi (Extensions)** > **Apps Script**.
+4. Hapus seluruh isi default, lalu salin dan tempelkan semua kode dari file [`google-apps-script.js`](google-apps-script.js).
+5. Klik ikon **Simpan** (Ctrl + S).
+6. Klik tombol biru **Terapkan (Deploy)** di pojok kanan atas > **Penerapan baru (New deployment)**.
+7. Klik ikon roda gigi di samping "Pilih jenis", pilih **Aplikasi web (Web app)**.
+8. Isi pengaturan:
+   - **Deskripsi**: `BRMP API`
+   - **Jalankan sebagai (Execute as)**: `Saya` (email akun Google Anda)
+   - **Siapa yang memiliki akses (Who has access)**: `Siapa saja` (*Penting agar server dapat membaca & menulis data*)
+9. Klik **Terapkan (Deploy)**, berikan izin akses Google (*Klik Beri Akses > Lanjutan > Buka... tidak aman*).
+10. Salin **URL Aplikasi Web** yang berakhiran `/exec`.
+11. Tambahkan ke file `.env` di komputer atau Environment Variables di Vercel:
+    ```env
+    GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/AKfycbx.../exec
+    ```
+
+---
+
+## ☁️ Panduan Deploy ke Vercel
+Aplikasi ini sudah siap dan dikonfigurasi penuh untuk Vercel Serverless (`vercel.json` dan `api/index.js`).
+
+1. Pastikan kode terbaru sudah di-*push* ke GitHub repository Anda (`https://github.com/Zaayyy/PantauAyam.git`).
+2. Buka dashboard [Vercel](https://vercel.com) dan login dengan akun GitHub Anda.
+3. Klik **Add New...** > **Project**.
+4. Impor repositori **`Zaayyy/PantauAyam`** (atau `icareMonitoring`).
+5. Pada bagian **Environment Variables**, tambahkan:
+   - **Key**: `GOOGLE_SCRIPT_URL`
+   - **Value**: *(URL Web App Apps Script dari langkah di atas)*
+6. Klik **Deploy**.
+7. Selesai! Web Anda akan aktif di domain gratis Vercel (contoh: `pantau-ayam.vercel.app`) dan semua data kandang, mutasi, penimbangan, serta foto kegiatan otomatis tersimpan di Google Spreadsheet & Google Drive Anda.
+
+---
+
+### Opsi Alternatif: Database Supabase
+Jika ingin menggunakan PostgreSQL via Supabase, setel `SUPABASE_URL` dan `SUPABASE_ANON_KEY` di environment variable Vercel, lalu jalankan `supabase-schema.sql` di SQL Editor Supabase.
 
 ---
 
