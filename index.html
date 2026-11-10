@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sistem monitoring ayam pedaging dan petelur BRMP DIY.">
+  <title>BRMP DIY - Monitoring Ayam</title>
+
+  <!-- Official BRMP DIY Favicon -->
+  <link rel="icon" type="image/png" href="assets/brmp-emblem.png">
+
+  <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Custom Stylesheet with Official BRMP DIY Brand Colors -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Top App Header with Official BRMP DIY Logos -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-wrapper">
+        <img src="assets/brmp-logo.png" alt="Logo Resmi BRMP DIY" class="brand-logo-img logo-light">
+        <img src="assets/brmp-logo-dark.png" alt="Logo Resmi BRMP DIY" class="brand-logo-img logo-dark">
+        <div class="brand-divider"></div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <span class="brand-app-name">Monitoring Ayam</span>
+            <span id="cloudStatusBadge" class="brand-badge" title="Status koneksi database">Memeriksa Database...</span>
+          </div>
+          <p>Monitoring Ayam Pedaging & Petelur • BRMP DIY</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="btn btn-icon" title="Ubah tampilan warna">
+          <i id="themeIcon" class="fa-solid fa-moon"></i>
+        </button>
+
+        <button id="btnViewStandards" class="btn btn-outline" title="Lihat Pustaka Acuan Bobot Standar">
+          <i class="fa-solid fa-book-bookmark"></i>
+          <span>Panduan Bobot</span>
+        </button>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+
+    <section class="production-switch" aria-label="Pilih jenis pemeliharaan">
+      <button type="button" class="production-switch-btn active" data-production-type="broiler">
+        <i class="fa-solid fa-drumstick-bite"></i>
+        <span>Ayam Pedaging</span>
+      </button>
+      <button type="button" class="production-switch-btn" data-production-type="layer">
+        <i class="fa-solid fa-egg"></i>
+        <span>Ayam Petelur</span>
+      </button>
+    </section>
+
+    <section class="category-intro" aria-live="polite">
+      <div>
+        <span id="categoryStep" class="category-step">Jenis pemeliharaan</span>
+        <h1 id="categoryTitle">Ayam Pedaging</h1>
+        <p id="categoryHelp">Catat pakan, jumlah ayam, dan bobot setiap minggu.</p>
+      </div>
+      <button id="btnCategoryAdd" class="btn btn-primary category-add-btn" type="button">
+        <i class="fa-solid fa-plus"></i>
+        <span>Catat Minggu Ini</span>
+      </button>
+    </section>
+
+    <!-- Friendly Empty State Hero (Tampil jika belum ada data kandang sama sekali) -->
+    <section id="emptyFlockHero" class="empty-onboarding-hero" style="display: none;">
+      <div class="empty-hero-icon">
+        <img src="assets/brmp-emblem.png" alt="Lambang BRMP DIY" style="width: 58px; height: 58px; object-fit: contain;">
+      </div>
+      <h2 id="emptyStateTitle">Monitoring Ayam Pedaging</h2>
+      <p>Belum ada kandang untuk kategori ini.<br>Tambahkan kandang terlebih dahulu untuk mulai mencatat.</p>
+      <button id="btnNewFlockHero" class="btn btn-primary">
+        <i class="fa-solid fa-plus"></i> Tambah Kandang
+      </button>
+    </section>
+
+    <!-- Flock / Kandang Selector & Meta Information (Clean Structured Card) -->
+    <section id="flockControlSection" class="flock-bar" style="display: none;">
+      
+      <!-- Baris 1: Kandang Selector & Actions -->
+      <div class="flock-bar-top">
+        <div class="flock-selector-group">
+          <span class="flock-badge-label">
+            Kandang yang dipantau
+          </span>
+          <select id="flockSelect" class="flock-select" title="Pilih Kandang / Batch Ayam"></select>
+        </div>
+
+        <div class="flock-actions-group">
+          <button id="btnNewFlock" class="btn btn-outline btn-sm" title="Tambah Kandang / Batch Baru">
+            <i class="fa-solid fa-plus"></i> Tambah Kandang
+          </button>
+          <button id="btnDeleteFlock" class="btn btn-danger btn-sm" title="Hapus Flok ini dari Database">
+            <i class="fa-solid fa-trash-can"></i> Hapus Kandang
+          </button>
+        </div>
+      </div>
+
+      <!-- Baris 2: Clean Metadata Stats Grid (Structured & Spacious) -->
+      <div class="flock-meta-grid">
+        <div class="meta-chip">
+          <div class="meta-chip-icon green">
+            <i class="fa-solid fa-dna"></i>
+          </div>
+          <div class="meta-chip-content">
+            <span class="meta-chip-label">Jenis ayam</span>
+            <span id="metaBreed" class="meta-chip-value">-</span>
+          </div>
+        </div>
+
+        <div class="meta-chip">
+          <div class="meta-chip-icon blue">
+            <i class="fa-regular fa-calendar-days"></i>
+          </div>
+          <div class="meta-chip-content">
+            <span class="meta-chip-label">Mulai Pemeliharaan</span>
+            <span id="metaDocDate" class="meta-chip-value">-</span>
+          </div>
+        </div>
+
+        <div class="meta-chip">
+          <div class="meta-chip-icon gold">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div class="meta-chip-content">
+            <span class="meta-chip-label">Jumlah ayam saat mulai</span>
+            <span id="metaInitialPop" class="meta-chip-value">-</span>
+          </div>
+        </div>
+
+        <div class="meta-chip">
+          <div class="meta-chip-icon crimson">
+            <i class="fa-solid fa-heart-pulse"></i>
+          </div>
+          <div class="meta-chip-content">
+            <span class="meta-chip-label">Jumlah ayam sekarang</span>
+            <div class="meta-chip-value">
+              <span id="metaCurrentPop">-</span>
+              <span style="font-size: 0.72rem; color: var(--primary-600); margin-left: 0.25rem;">(<span id="metaSurvivalRate">100%</span>)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Main Dashboard Content (KPIs, Charts, Table) -->
+    <div id="mainDashboardContent" style="display: flex; flex-direction: column; gap: 1.35rem;">
+
+      <!-- Key Performance Indicator (KPI) Cards -->
+      <section class="kpi-grid">
+        <div class="kpi-card emerald">
+          <div class="kpi-header">
+            <span id="kpi1Title" class="kpi-title">Populasi Saat Ini</span>
+            <div class="kpi-icon"><i class="fa-solid fa-house-chimney-user"></i></div>
+          </div>
+          <div class="kpi-value-row">
+            <span id="kpi1Value" class="kpi-value">0</span>
+            <span id="kpi1Unit" class="kpi-unit">ekor</span>
+          </div>
+          <div class="kpi-footer"><span id="kpi1Sub">Populasi terkini</span></div>
+        </div>
+
+        <div class="kpi-card emerald">
+          <div class="kpi-header">
+            <span id="kpi2Title" class="kpi-title">Bobot Mingguan</span>
+            <div class="kpi-icon"><i class="fa-solid fa-weight-scale"></i></div>
+          </div>
+          <div class="kpi-value-row">
+            <span id="kpi2Value" class="kpi-value">-</span>
+            <span id="kpi2Unit" class="kpi-unit">gram/ekor</span>
+          </div>
+          <div class="kpi-footer"><span id="kpi2Sub">Belum ada data</span></div>
+        </div>
+
+        <div class="kpi-card blue">
+          <div class="kpi-header">
+            <span id="kpi3Title" class="kpi-title">Pakan Diberikan</span>
+            <div class="kpi-icon"><i class="fa-solid fa-bowl-food"></i></div>
+          </div>
+          <div class="kpi-value-row">
+            <span id="kpi3Value" class="kpi-value">0</span>
+            <span id="kpi3Unit" class="kpi-unit">kg</span>
+          </div>
+          <div class="kpi-footer"><span id="kpi3Sub">Minggu terakhir</span></div>
+        </div>
+
+        <div class="kpi-card amber">
+          <div class="kpi-header">
+            <span id="kpi4Title" class="kpi-title">Mutasi Populasi</span>
+            <div class="kpi-icon"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+          </div>
+          <div class="kpi-value-row">
+            <span id="kpi4Value" class="kpi-value">0</span>
+            <span id="kpi4Unit" class="kpi-unit">ekor</span>
+          </div>
+          <div class="kpi-footer"><span id="kpi4Sub">Ayam bertambah • berkurang</span></div>
+        </div>
+      </section>
+
+      <!-- Smart Recommendations & Insights Banner -->
+      <details class="advanced-section">
+        <summary>Lihat grafik perkembangan bobot</summary>
+      <div id="broilerAnalytics">
+      <section id="growthInsightCard" class="growth-insight-card">
+        <!-- Injected via JavaScript -->
+      </section>
+
+      <!-- Visualisasi Grafik Utama (Kurva Pertumbuhan & Sebaran Keseragaman) -->
+      <section class="charts-grid">
+        <!-- Main Growth Curve Line Chart -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2>
+                Kurva Pertumbuhan Mingguan (Aktual vs Standar BRMP)
+                <span class="info-tip" data-tooltip="Garis hijau adalah bobot timbangan Anda. Garis biru putus-putus adalah acuan standar BRMP.">?</span>
+              </h2>
+              <p>Melihat apakah grafik bobot ayam tumbuh sesuai laju pertumbuhan ideal</p>
+            </div>
+            <span class="badge-status optimal">
+              <i class="fa-solid fa-database" style="font-size: 0.65rem;"></i> Database Live
+            </span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="growthChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Flock Uniformity Doughnut Chart -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2>
+                Keseragaman Sampling Terkini
+                <span class="info-tip" data-tooltip="Memperlihatkan proporsi ayam yang pas dengan target, terlalu kecil (underweight), atau terlalu besar.">?</span>
+              </h2>
+              <p>Distribusi bobot ayam sampel timbangan (toleransi ±10%)</p>
+            </div>
+          </div>
+          <div class="chart-wrapper donut">
+            <canvas id="distributionChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sub Charts Row: Pertambahan Bobot Mingguan + ADG -->
+      <section class="sub-charts-row">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2>Kenaikan Bobot per Minggu (Gain) & Rata-rata Kenaikan Harian (ADG)</h2>
+              <p>Mendeteksi apakah terjadi perlambatan pertumbuhan pada minggu tertentu</p>
+            </div>
+          </div>
+          <div class="chart-wrapper" style="height: 270px;">
+            <canvas id="gainChart"></canvas>
+          </div>
+        </div>
+      </section>
+      </div>
+      </details>
+
+      <!-- Data Table Penimbangan Lengkap -->
+      <section class="table-card">
+        <div class="table-toolbar">
+          <div>
+            <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700;">
+              <span id="monitoringTableTitle">Rekapitulasi Monitoring</span>
+            </h2>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;">
+              Riwayat catatan untuk kandang ini
+            </p>
+          </div>
+
+          <div class="table-actions">
+            <a href="/api/backup/database" class="btn btn-outline btn-sm" title="Unduh Berkas Database Asli (SQLite)" download>
+              <i class="fa-solid fa-database" style="color: var(--blue-600);"></i> Simpan Salinan Data
+            </a>
+            <button id="btnExportCsv" class="btn btn-outline btn-sm" title="Unduh data dalam format CSV / Excel">
+              <i class="fa-solid fa-file-excel" style="color: var(--primary-600);"></i> Unduh Laporan
+            </button>
+            <button id="btnPrintReport" class="btn btn-outline btn-sm" title="Cetak Lembar Monitoring Resmi BRMP">
+              <i class="fa-solid fa-print"></i> Cetak Laporan
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead id="monitoringTableHead"><tr></tr></thead>
+            <tbody id="weighingsTableBody">
+              <!-- Injected via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- App Footer -->
+    <footer class="app-footer">
+      <img src="assets/brmp-emblem.png" alt="Emblem BRMP" class="footer-emblem">
+      <p><strong>Balai Penerapan Standar Instrumen Pertanian / Riset Unggas D.I. Yogyakarta</strong></p>
+      <p style="margin-top: 0.25rem; font-size: 0.74rem; opacity: 0.85;">PoultryTrack &bull; Sistem Monitoring Perkembangan & Penimbangan Ayam Mingguan &bull; Database SQLite Aktif.</p>
+    </footer>
+
+  </main>
+
+  <div id="modalBroilerMonitoring" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <span class="form-category-label">Khusus ayam pedaging</span>
+          <h3 id="broilerFormTitle">Catat Ayam Pedaging</h3>
+        </div>
+        <button type="button" class="modal-close-btn" aria-label="Tutup">&times;</button>
+      </div>
+
+      <form id="formBroilerMonitoring">
+        <div class="modal-body">
+          <p class="form-intro">Isi data untuk minggu ini. Kolom bertanda * wajib diisi.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="broilerWeek">Minggu ke- *</label>
+              <input type="number" id="broilerWeek" min="0" max="52" required>
+              <span class="form-hint">Contoh: minggu pertama isi 1.</span>
+            </div>
+            <div class="form-group">
+              <label for="broilerDate">Tanggal pencatatan *</label>
+              <input type="date" id="broilerDate" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="broilerWeight">Rata-rata bobot ayam (gram) *</label>
+              <input type="number" id="broilerWeight" min="1" step="0.1" required placeholder="Contoh: 425">
+            </div>
+            <div class="form-group">
+              <label for="broilerFeed">Pakan diberikan (kg) *</label>
+              <input type="number" id="broilerFeed" min="0" step="0.1" required placeholder="Contoh: 80">
+            </div>
+          </div>
+          <div class="form-section-label">Perubahan jumlah ayam (isi 0 bila tidak ada)</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="broilerAdded">Bertambah (ekor)</label>
+              <input type="number" id="broilerAdded" min="0" step="1" value="0">
+            </div>
+            <div class="form-group">
+              <label for="broilerDecreased">Berkurang (ekor)</label>
+              <input type="number" id="broilerDecreased" min="0" step="1" value="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="broilerNotes">Catatan (opsional)</label>
+            <input type="text" id="broilerNotes" placeholder="Contoh: kondisi ayam atau pemberian vitamin">
+          </div>
+          <div class="form-group">
+            <label for="broilerPhoto">Foto kegiatan (opsional)</label>
+            <input type="file" id="broilerPhoto" accept="image/*">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline btn-close-modal">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Simpan Catatan Pedaging</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modalLayerProduction" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <span class="form-category-label">Khusus ayam petelur</span>
+          <h3 id="layerFormTitle">Catat Produksi Telur</h3>
+        </div>
+        <button type="button" class="modal-close-btn" aria-label="Tutup">&times;</button>
+      </div>
+
+      <form id="formLayerProduction">
+        <div class="modal-body">
+          <p class="form-intro">Isi hasil minggu ini. Data petelur dicatat terpisah dari ayam pedaging.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="layerWeek">Minggu ke- *</label>
+              <input type="number" id="layerWeek" min="0" max="52" required>
+              <span class="form-hint">Contoh: minggu pertama isi 1.</span>
+            </div>
+            <div class="form-group">
+              <label for="layerDate">Tanggal pencatatan *</label>
+              <input type="date" id="layerDate" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="layerEggCount">Jumlah telur (butir) *</label>
+              <input type="number" id="layerEggCount" min="0" step="1" required placeholder="Contoh: 185">
+            </div>
+            <div class="form-group">
+              <label for="layerEggWeight">Total berat telur (kg) *</label>
+              <input type="number" id="layerEggWeight" min="0" step="0.01" required placeholder="Contoh: 11.25">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="layerFeed">Pakan diberikan minggu ini (kg) *</label>
+            <input type="number" id="layerFeed" min="0" step="0.1" required placeholder="Contoh: 80">
+          </div>
+          <div class="form-section-label">Perubahan jumlah ayam (isi 0 bila tidak ada)</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="layerAdded">Bertambah (ekor)</label>
+              <input type="number" id="layerAdded" min="0" step="1" value="0">
+            </div>
+            <div class="form-group">
+              <label for="layerDecreased">Berkurang (ekor)</label>
+              <input type="number" id="layerDecreased" min="0" step="1" value="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="layerNotes">Catatan (opsional)</label>
+            <input type="text" id="layerNotes" placeholder="Contoh: kondisi ayam atau kualitas telur">
+          </div>
+          <div class="form-group">
+            <label for="layerPhoto">Foto kegiatan (opsional)</label>
+            <input type="file" id="layerPhoto" accept="image/*">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline btn-close-modal">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Simpan Catatan Petelur</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: Tambah Flok / Kandang Baru -->
+  <!-- ========================================================================= -->
+  <div id="modalNewFlock" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <span id="flockFormCategory" class="form-category-label">Kandang ayam pedaging</span>
+          <h3 id="flockFormTitle">Tambah Kandang</h3>
+        </div>
+        <button type="button" class="modal-close-btn">&times;</button>
+      </div>
+
+      <form id="formNewFlock">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="flockName">Nama kandang *</label>
+            <input type="text" id="flockName" required placeholder="Contoh: Kandang A">
+          </div>
+
+          <input type="hidden" id="flockCode">
+          <input type="hidden" id="flockType" value="broiler">
+          <div class="form-group">
+            <label for="flockBreed">Jenis ayam *</label>
+            <select id="flockBreed" required>
+              <option value="kub">Ayam KUB</option>
+              <option value="joper">Ayam Joper</option>
+              <option value="broiler">Ayam Broiler</option>
+              <option value="kampung_asli">Ayam Kampung</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="flockDocDate">Tanggal mulai *</label>
+              <input type="date" id="flockDocDate" required>
+            </div>
+            <div class="form-group">
+              <label for="flockInitialPop">Jumlah ayam saat mulai (ekor) *</label>
+              <input type="number" id="flockInitialPop" min="1" value="200" required>
+            </div>
+          </div>
+
+          <details class="optional-details">
+            <summary>Tambahkan keterangan lain (opsional)</summary>
+            <div class="form-group">
+              <label for="flockLocation">Lokasi kandang</label>
+              <input type="text" id="flockLocation" placeholder="Contoh: Kandang utara">
+            </div>
+            <div class="form-group">
+              <label for="flockOfficer">Nama petugas</label>
+              <input type="text" id="flockOfficer" placeholder="Nama petugas">
+            </div>
+            <div class="form-group">
+              <label for="flockNotes">Catatan</label>
+              <input type="text" id="flockNotes" placeholder="Keterangan tambahan">
+            </div>
+            <input type="hidden" id="flockCageType">
+          </details>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline btn-close-modal">Batal</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Simpan Kandang
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: Lightbox Penampil Foto Dokumentasi -->
+  <!-- ========================================================================= -->
+  <div id="modalPhotoViewer" class="modal-overlay">
+    <div class="modal-content lightbox-content">
+      <div class="modal-header">
+        <h3 id="lightboxTitle">Foto Dokumentasi Penimbangan</h3>
+        <button type="button" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="lightbox-img-wrapper">
+        <img id="lightboxImg" src="" alt="Foto Dokumentasi">
+      </div>
+      <div class="lightbox-details">
+        <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
+          <span id="lightboxDate" style="font-weight: 700; color: var(--primary-700);"></span>
+          <span id="lightboxWeight" style="font-weight: 600; color: var(--blue-600);"></span>
+        </div>
+        <p id="lightboxNotes" style="font-size: 0.85rem; color: var(--text-main);"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline btn-close-modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: Pustaka Standar Bobot Ayam BRMP -->
+  <!-- ========================================================================= -->
+  <div id="modalStandards" class="modal-overlay">
+    <div class="modal-content" style="max-width: 840px;">
+      <div class="modal-header">
+        <div>
+          <h3>Pustaka Acuan Standar Bobot Ayam BRMP</h3>
+          <p style="font-size:0.78rem; color:var(--text-muted); margin-top: 0.15rem;">
+            Tabel acuan pertumbuhan bobot mingguan berdasarkan riset Balitbangtan / BRMP
+          </p>
+        </div>
+        <button type="button" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="standardsContainer" class="standards-grid">
+          <!-- Injected via JavaScript -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary btn-close-modal">Tutup Pustaka</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic Scripts -->
+  <script src="js/standards.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

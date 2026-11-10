@@ -1,0 +1,15 @@
+# Node Modules
+node_modules/
+
+# Local databases & uploads (Vercel uses /tmp)
+data/*.sqlite
+data/*.json
+uploads/documentation/*
+!uploads/documentation/.gitkeep
+
+# Vercel Cache
+.vercel/
+
+# Environment files
+.env
+.env.local
